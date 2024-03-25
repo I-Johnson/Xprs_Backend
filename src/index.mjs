@@ -1,7 +1,9 @@
-import express from 'express';
+import express, { response } from 'express';
 import router from './routes/index.mjs';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
+import { myUsers } from './utils/constants.mjs';
+import e from 'express';
 
 
 const app = express()
@@ -32,3 +34,44 @@ app.get('/', (request, response) => {
 app.listen(PORT, () => {
     console.log(`Running on Port ${PORT}`);
 }) 
+
+app.post("/api/auth", (request, response) => {
+    const {
+        body: {username, password},
+    } = request; 
+    const findUser = myUsers.find(
+        user => user.username === username
+    );
+    if (!findUser || findUser.password !== password) 
+        return response.status(401).send({msg: "Invalid credentials"});
+    
+    request.session.user = findUser;
+    return response.status(200).send(findUser);
+})
+
+app.get("/api/auth/status", (request, response) => {
+    request.sessionStore.get(request.sessionID, (err, session) => {
+        console.log(session);
+    });
+    return request.session.user ? response.status(200).send(request.session.user) 
+    : response.status(401).send({msg: "Unauthorized"});
+})
+
+app.post("/api/cart", (request,response) => {
+    if(!request.session.user) return response.sendStatus(401);
+    const {body: item} = request;
+
+    const {cart} = request.session;
+    if(cart) {
+        cart.push(item);
+    }
+    else {
+        request.session.cart = [item];
+    }
+    return response.status(201).send(item);
+});
+
+app.get("/api/cart", (request, response) => {
+    if(!request.session.user) return response.sendStatus(401);
+    return response.send(request.session.cart || []);
+})
